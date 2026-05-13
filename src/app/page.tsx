@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { getDictionaries, type Dictionary } from '@/lib/db';
+import { getDictionaries, isDatabaseAvailable, type Dictionary } from '@/lib/db';
 
 // ── Color helpers ──────────────────────────────────────────────────────────
 
@@ -152,6 +152,15 @@ function BookCard({ dict }: { dict: Dictionary }) {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
+  if (!isDatabaseAvailable()) {
+    return (
+      <div className="text-center py-24">
+        <p className="text-cream/40 text-sm font-serif italic">База данных не загружена</p>
+        <p className="text-cream/20 text-xs font-mono mt-2">Загрузите dictionary.db в /app/data и перезапустите сервис</p>
+      </div>
+    );
+  }
+
   const dicts = getDictionaries();
 
   return (

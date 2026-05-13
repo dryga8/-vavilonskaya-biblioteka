@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { notFound } from 'next/navigation';
-import { getDictionary, getEntry } from '@/lib/db';
+import { getDictionary, getEntry, isDatabaseAvailable } from '@/lib/db';
 
 interface Props {
   params: { dict: string; entry: string };
@@ -59,6 +59,15 @@ function renderBody(body: string) {
 }
 
 export default function EntryPage({ params }: Props) {
+  if (!isDatabaseAvailable()) {
+    return (
+      <div className="text-center py-24">
+        <p className="text-cream/40 text-sm font-serif italic">База данных не загружена</p>
+        <p className="text-cream/20 text-xs font-mono mt-2">Загрузите dictionary.db в /app/data и перезапустите сервис</p>
+      </div>
+    );
+  }
+
   const dict = getDictionary(params.dict);
   if (!dict) notFound();
 

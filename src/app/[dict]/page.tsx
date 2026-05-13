@@ -7,6 +7,7 @@ import {
   getEntriesByLetter,
   searchEntries,
   suggestEntries,
+  isDatabaseAvailable,
   type Entry,
   type SearchResult,
 } from '@/lib/db';
@@ -149,6 +150,15 @@ function DictHeader({ dict }: { dict: NonNullable<ReturnType<typeof getDictionar
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function DictPage({ params, searchParams }: Props) {
+  if (!isDatabaseAvailable()) {
+    return (
+      <div className="text-center py-24">
+        <p className="text-cream/40 text-sm font-serif italic">База данных не загружена</p>
+        <p className="text-cream/20 text-xs font-mono mt-2">Загрузите dictionary.db в /app/data и перезапустите сервис</p>
+      </div>
+    );
+  }
+
   const dict = getDictionary(params.dict);
   if (!dict) notFound();
 

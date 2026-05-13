@@ -11,12 +11,19 @@ if (!fs.existsSync(dbDir)) {
 
 let _db: Database.Database | null = null;
 
-export function getDb(): Database.Database {
-  if (!_db) {
+function getDb(): Database.Database | null {
+  if (_db) return _db;
+  try {
     _db = new Database(DB_PATH, { readonly: true });
     _db.pragma('journal_mode = WAL');
+    return _db;
+  } catch {
+    return null;
   }
-  return _db;
+}
+
+export function isDatabaseAvailable(): boolean {
+  return getDb() !== null;
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -52,47 +59,47 @@ export interface SearchGroups {
 // ── Queries ────────────────────────────────────────────────────────────────
 
 export function getDictionaries(): Dictionary[] {
-  return getDb()
-    .prepare('SELECT * FROM dictionaries ORDER BY name')
-    .all() as Dictionary[];
+  const db = getDb();
+  if (!db) return [];
+  return db.prepare('SELECT * FROM dictionaries ORDER BY name').all() as Dictionary[];
 }
 
 export function getDictionary(slug: string): Dictionary | undefined {
-  return getDb()
-    .prepare('SELECT * FROM dictionaries WHERE slug = ?')
-    .get(slug) as Dictionary | undefined;
+  const db = getDb();
+  if (!db) return undefined;
+  return db.prepare('SELECT * FROM dictionaries WHERE slug = ?').get(slug) as Dictionary | undefined;
 }
 
 export function getEntry(dictSlug: string, entrySlug: string): Entry | undefined {
-  return getDb()
-    .prepare(`
-      SELECT e.* FROM entries e
-      JOIN dictionaries d ON d.id = e.dictionary_id
-      WHERE d.slug = ? AND e.slug = ?
-    `)
-    .get(dictSlug, entrySlug) as Entry | undefined;
+  const db = getDb();
+  if (!db) return undefined;
+  return db.prepare(`
+    SELECT e.* FROM entries e
+    JOIN dictionaries d ON d.id = e.dictionary_id
+    WHERE d.slug = ? AND e.slug = ?
+  `).get(dictSlug, entrySlug) as Entry | undefined;
 }
 
 export function getEntriesByLetter(dictSlug: string, letter: string): Entry[] {
-  return getDb()
-    .prepare(`
-      SELECT e.* FROM entries e
-      JOIN dictionaries d ON d.id = e.dictionary_id
-      WHERE d.slug = ? AND e.letter = ?
-      ORDER BY e.title
-    `)
-    .all(dictSlug, letter) as Entry[];
+  const db = getDb();
+  if (!db) return [];
+  return db.prepare(`
+    SELECT e.* FROM entries e
+    JOIN dictionaries d ON d.id = e.dictionary_id
+    WHERE d.slug = ? AND e.letter = ?
+    ORDER BY e.title
+  `).all(dictSlug, letter) as Entry[];
 }
 
 export function getLetters(dictSlug: string): string[] {
-  const rows = getDb()
-    .prepare(`
-      SELECT DISTINCT e.letter FROM entries e
-      JOIN dictionaries d ON d.id = e.dictionary_id
-      WHERE d.slug = ?
-      ORDER BY e.letter
-    `)
-    .all(dictSlug) as { letter: string }[];
+  const db = getDb();
+  if (!db) return [];
+  const rows = db.prepare(`
+    SELECT DISTINCT e.letter FROM entries e
+    JOIN dictionaries d ON d.id = e.dictionary_id
+    WHERE d.slug = ?
+    ORDER BY e.letter
+  `).all(dictSlug) as { letter: string }[];
   return rows.map((r) => r.letter);
 }
 
@@ -109,6 +116,7 @@ export function searchEntries(dictSlug: string, query: string): SearchGroups {
   if (!q) return { inTitle: [], inBody: [] };
 
   const db = getDb();
+  if (!db) return { inTitle: [], inBody: [] };
   const stmt = db.prepare(`
     SELECT e.*, fts.rank FROM entries e
     JOIN entries_fts fts ON fts.rowid = e.id
@@ -140,6 +148,7 @@ export function suggestEntries(dictSlug: string, query: string, limit = 8): Entr
   if (!q) return [];
 
   const db = getDb();
+  if (!db) return [];
   const seen = new Set<number>();
   // Collect from all passes first, slice at the end — this ensures later passes
   // (suffix LIKE) contribute even if earlier passes already filled the limit.
