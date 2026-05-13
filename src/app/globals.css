@@ -2,26 +2,108 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@layer base {
+  body {
+    background-color: #0F0F1A;
+    color: #E8E0CC;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  ::selection {
+    background: rgba(201, 168, 76, 0.25);
+    color: #FAF8F2;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: #0F0F1A; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(201, 168, 76, 0.25);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(201, 168, 76, 0.45);
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+/* ── Book on shelf ────────────────────────────────────────────────────────── */
+
+.book {
+  display: block;
+  flex-shrink: 0;
+  position: relative;
+  transform-origin: center bottom;
+  transition: transform 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  text-decoration: none;
+}
+
+/* Floor shadow — moves down and fades when book is lifted */
+.book::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 10px;  /* clears the spine border */
+  right: -4px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.5);
+  filter: blur(8px);
+  border-radius: 50%;
+  z-index: -1;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.book:hover {
+  transform: translateY(-10px);
+}
+
+.book:hover::after {
+  opacity: 0.55;
+  transform: translateY(8px) scaleX(0.88);
+}
+
+.book-inner {
+  transition: box-shadow 0.22s ease;
+}
+
+.book:hover .book-inner {
+  box-shadow: 6px 22px 36px rgba(0, 0, 0, 0.75),
+              inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* ── Shelf board ───────────────────────────────────────────────────────────── */
+
+.shelf-board {
+  height: 18px;
+  background: linear-gradient(to bottom, #2C2412 0%, #1A1608 55%, #100E05 100%);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.75),
+    inset 0 2px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6);
+  border-radius: 1px 1px 2px 2px;
+}
+
+.shelf-shadow {
+  height: 28px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0%, transparent 100%);
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .card-parchment {
+    background-color: #FAF8F2;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border: 1px solid rgba(201, 168, 76, 0.2);
+    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(201, 168, 76, 0.08);
+  }
+
+  .hover-glow:hover {
+    border-color: rgba(201, 168, 76, 0.5);
+    box-shadow: 0 0 24px rgba(201, 168, 76, 0.12), 0 4px 32px rgba(0, 0, 0, 0.5);
+  }
+
+  .body-serif {
+    font-family: Georgia, 'Times New Roman', serif;
+    line-height: 1.85;
+    color: #2D2A22;
   }
 }
