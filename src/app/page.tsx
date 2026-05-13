@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getDictionaries, type Dictionary } from '@/lib/db';
 
 // ── Color helpers ──────────────────────────────────────────────────────────
