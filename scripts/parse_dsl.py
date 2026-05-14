@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Parse DSL dictionary file into SQLite with FTS5."""
 
+import html as html_lib
 import re
 import sqlite3
 import unicodedata
@@ -19,6 +20,10 @@ DICTIONARY = {
 
 TAG_RE = re.compile(r'\[/?[^\]]*?\]')
 REF_RE = re.compile(r'<<([^>]+)>>')
+STAR_REF_RE = re.compile(r'\*([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё \t\-,\'"]*)')
+_TRAILING_FW = re.compile(
+    r'\s+(?:and|or|the|of|in|to|a|an|see|also)\s*$', re.IGNORECASE
+)
 
 
 def strip_tags(text: str) -> str:
@@ -28,8 +33,7 @@ def strip_tags(text: str) -> str:
     text = text.replace(r'\[', '\x00LB\x00').replace(r'\]', '\x00RB\x00')
     # Remove all [tag] / [/tag]
     text = TAG_RE.sub('', text)
-    # <<Reference>> → Reference
-    text = REF_RE.sub(r'\1', text)
+    # <<Reference>> is preserved here; linkify_body() converts it to <a> later
     # Restore literal brackets
     text = text.replace('\x00LB\x00', '[').replace('\x00RB\x00', ']')
     # collapse multiple spaces/tabs
@@ -48,6 +52,31 @@ def slugify(title: str, seen: set) -> str:
         n += 1
     seen.add(s)
     return s
+
+
+def slugify_ref(title: str) -> str:
+    """Slugify a cross-reference title (no dedup — used for href generation only)."""
+    s = title.lower().strip()
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r'[^a-z0-9]+', '-', s).strip('-') or 'entry'
+
+
+def linkify_body(text: str, dict_slug: str) -> str:
+    """Convert <<ref>> and *Word cross-references to HTML anchor tags."""
+    def repl_ref(m):
+        ref = m.group(1).strip()
+        return f'<a href="/{dict_slug}/{slugify_ref(ref)}">{html_lib.escape(ref)}</a>'
+    text = REF_RE.sub(repl_ref, text)
+
+    def repl_star(m):
+        ref = m.group(1).rstrip(' \t,')
+        ref = _TRAILING_FW.sub('', ref).rstrip()
+        if not ref:
+            return m.group(0)
+        return f'<a href="/{dict_slug}/{slugify_ref(ref)}">{html_lib.escape(ref)}</a>'
+    text = STAR_REF_RE.sub(repl_star, text)
+    return text
 
 
 def first_letter(title: str) -> str:
@@ -164,9 +193,11 @@ def build_db(db_path: Path):
 
         # embed alt headwords into body so FTS finds them too
         alts = [strip_tags(h) for h in headwords[1:] if strip_tags(h)]
-        full_body = body
+        linked_body = linkify_body(body, DICTIONARY['slug'])
         if alts:
-            full_body = ('= ' + '; '.join(alts) + '\n' + body).strip()
+            full_body = ('= ' + '; '.join(alts) + '\n' + linked_body).strip()
+        else:
+            full_body = linked_body
 
         slug = slugify(primary, seen_slugs)
         letter = first_letter(primary)

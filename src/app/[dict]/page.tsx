@@ -51,6 +51,7 @@ function EntryList({ entries, dictSlug }: { entries: (Entry | SearchResult)[]; d
       {entries.map((e) => {
         const snippet = (e.body ?? '')
           .replace(/^= [^\n]+\n?/, '')
+          .replace(/<[^>]+>/g, '')
           .split('\n')
           .find((l) => l.trim().length > 0)
           ?.slice(0, 90) ?? '';

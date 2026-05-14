@@ -106,4 +106,16 @@
     line-height: 1.85;
     color: #2D2A22;
   }
+
+  .body-serif a {
+    color: #7A6030;
+    text-decoration: underline;
+    text-decoration-color: rgba(201, 168, 76, 0.45);
+    text-underline-offset: 2px;
+    transition: color 0.15s;
+  }
+
+  .body-serif a:hover {
+    color: #C9A84C;
+  }
 }

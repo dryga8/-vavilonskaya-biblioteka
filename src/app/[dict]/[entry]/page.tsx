@@ -47,11 +47,10 @@ function renderBody(body: string) {
       continue;
     }
 
-    // Regular body line
+    // Regular body line — dangerouslySetInnerHTML to render <a> cross-refs
     elements.push(
-      <p key={i} className="mb-3 last:mb-0 body-serif" style={{ color: '#2D2A22' }}>
-        {line}
-      </p>,
+      <p key={i} className="mb-3 last:mb-0 body-serif" style={{ color: '#2D2A22' }}
+         dangerouslySetInnerHTML={{ __html: line }} />,
     );
   }
 
