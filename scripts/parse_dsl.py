@@ -16,6 +16,8 @@ DICTIONARY = {
     "description": "Энциклопедический словарь американской культуры",
     "color": "#534AB7",
     "language": "en",
+    "reliability": "approved",
+    "field": "GENERAL",
 }
 
 TAG_RE = re.compile(r'\[/?[^\]]*?\]')
@@ -149,7 +151,9 @@ def build_db(db_path: Path):
             description TEXT,
             color       TEXT,
             language    TEXT,
-            entry_count INTEGER DEFAULT 0
+            entry_count INTEGER DEFAULT 0,
+            reliability TEXT,
+            field       TEXT
         );
 
         CREATE TABLE entries (
@@ -176,9 +180,11 @@ def build_db(db_path: Path):
     """)
 
     con.execute(
-        "INSERT INTO dictionaries(slug, name, description, color, language) VALUES(?,?,?,?,?)",
+        "INSERT INTO dictionaries(slug, name, description, color, language, reliability, field)"
+        " VALUES(?,?,?,?,?,?,?)",
         (DICTIONARY['slug'], DICTIONARY['name'], DICTIONARY['description'],
-         DICTIONARY['color'], DICTIONARY['language']),
+         DICTIONARY['color'], DICTIONARY['language'],
+         DICTIONARY.get('reliability'), DICTIONARY.get('field')),
     )
     dict_id = con.execute("SELECT last_insert_rowid()").fetchone()[0]
 

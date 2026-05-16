@@ -11,6 +11,7 @@ import {
   type Entry,
   type SearchResult,
 } from '@/lib/db';
+import { ReliabilityBadge } from '@/components/ReliabilityBadge';
 import SearchBox from './SearchBox';
 
 interface Props {
@@ -142,6 +143,11 @@ function DictHeader({ dict }: { dict: NonNullable<ReturnType<typeof getDictionar
           <p className="text-[11px] text-cream/25 mt-1 font-mono uppercase tracking-widest">
             {dict.entry_count.toLocaleString('ru-RU')} статей
           </p>
+          {dict.reliability && (
+            <div className="mt-2">
+              <ReliabilityBadge reliability={dict.reliability} />
+            </div>
+          )}
         </div>
       </div>
     </div>

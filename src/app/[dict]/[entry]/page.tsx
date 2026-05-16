@@ -2,9 +2,11 @@ export const dynamic = 'force-dynamic';
 
 import { notFound } from 'next/navigation';
 import { getDictionary, getEntry, isDatabaseAvailable } from '@/lib/db';
+import { ReliabilityBadge } from '@/components/ReliabilityBadge';
 
 interface Props {
   params: { dict: string; entry: string };
+  searchParams: { back?: string };
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -57,7 +59,7 @@ function renderBody(body: string) {
   return <>{elements}</>;
 }
 
-export default function EntryPage({ params }: Props) {
+export default function EntryPage({ params, searchParams }: Props) {
   if (!isDatabaseAvailable()) {
     return (
       <div className="text-center py-24">
@@ -107,7 +109,7 @@ export default function EntryPage({ params }: Props) {
           </h1>
 
           {/* Meta */}
-          <div className="flex items-center gap-3 mt-3">
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
             <span
               className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded"
               style={{ color: dict.color, background: dict.color + '18', border: `1px solid ${dict.color}44` }}
@@ -115,6 +117,9 @@ export default function EntryPage({ params }: Props) {
               {dict.language}
             </span>
             <span className="text-[12px] font-mono text-ink/30">{entry.letter}</span>
+            {dict.reliability && (
+              <ReliabilityBadge reliability={dict.reliability} />
+            )}
           </div>
         </header>
 
@@ -130,14 +135,23 @@ export default function EntryPage({ params }: Props) {
         </div>
       </article>
 
-      {/* Back link */}
-      <div className="mt-7 flex items-center justify-between">
-        <a
-          href={`/${dict.slug}?letter=${entry.letter}`}
-          className="text-[12px] text-cream/35 hover:text-gold transition-colors font-sans"
-        >
-          ← Все статьи на «{entry.letter}»
-        </a>
+      {/* Back links */}
+      <div className="mt-7 flex items-center justify-between flex-wrap gap-3">
+        {searchParams.back?.startsWith('/search') ? (
+          <a
+            href={searchParams.back}
+            className="text-[12px] text-cream/35 hover:text-gold transition-colors font-sans"
+          >
+            ← К результатам поиска
+          </a>
+        ) : (
+          <a
+            href={`/${dict.slug}?letter=${entry.letter}`}
+            className="text-[12px] text-cream/35 hover:text-gold transition-colors font-sans"
+          >
+            ← Все статьи на «{entry.letter}»
+          </a>
+        )}
         <a
           href={`/${dict.slug}`}
           className="text-[12px] text-cream/35 hover:text-gold transition-colors font-sans"

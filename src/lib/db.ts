@@ -36,6 +36,14 @@ export interface Dictionary {
   color: string;
   language: string;
   entry_count: number;
+  reliability: string | null;
+  field: string | null;
+}
+
+export interface GlobalSearchGroup {
+  dict: Dictionary;
+  results: SearchResult[];
+  totalCount: number;
 }
 
 export interface Entry {
@@ -138,6 +146,59 @@ export function searchEntries(dictSlug: string, query: string): SearchGroups {
   const inBody = allRows.filter((r) => !titleIds.has(r.id)).slice(0, BODY_LIMIT);
 
   return { inTitle, inBody };
+}
+
+export function globalSearch(query: string, dictSlugs?: string[]): GlobalSearchGroup[] {
+  const q = escapeFts(query);
+  if (!q) return [];
+  const db = getDb();
+  if (!db) return [];
+
+  let dicts = getDictionaries();
+  if (dictSlugs?.length) {
+    dicts = dicts.filter((d) => dictSlugs.includes(d.slug));
+  }
+
+  const groups: GlobalSearchGroup[] = [];
+
+  for (const dict of dicts) {
+    const inTitle = db
+      .prepare(
+        `SELECT e.*, fts.rank FROM entries e
+         JOIN entries_fts fts ON fts.rowid = e.id
+         WHERE e.dictionary_id = ? AND entries_fts MATCH ?
+         ORDER BY fts.rank LIMIT 5`,
+      )
+      .all(dict.id, `title:${q}*`) as SearchResult[];
+
+    const titleIds = new Set(inTitle.map((r) => r.id));
+
+    const allRows = db
+      .prepare(
+        `SELECT e.*, fts.rank FROM entries e
+         JOIN entries_fts fts ON fts.rowid = e.id
+         WHERE e.dictionary_id = ? AND entries_fts MATCH ?
+         ORDER BY fts.rank LIMIT 10`,
+      )
+      .all(dict.id, `${q}*`) as SearchResult[];
+
+    const inBody = allRows.filter((r) => !titleIds.has(r.id));
+    const results = [...inTitle, ...inBody].slice(0, 5);
+
+    if (results.length === 0) continue;
+
+    const { cnt } = db
+      .prepare(
+        `SELECT COUNT(*) as cnt FROM entries e
+         JOIN entries_fts fts ON fts.rowid = e.id
+         WHERE e.dictionary_id = ? AND entries_fts MATCH ?`,
+      )
+      .get(dict.id, `${q}*`) as { cnt: number };
+
+    groups.push({ dict, results, totalCount: cnt });
+  }
+
+  return groups;
 }
 
 export function suggestEntries(dictSlug: string, query: string, limit = 8): Entry[] {
