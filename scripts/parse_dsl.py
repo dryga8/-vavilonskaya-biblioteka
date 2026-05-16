@@ -7,17 +7,25 @@ Usage:
 """
 
 import html as html_lib
+import os
 import re
 import sqlite3
 import sys
 import unicodedata
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "data" / "dictionary.db"
+# DB_PATH: where to write the database.
+# On Railway set DB_PATH=/app/data/dictionary.db
+DB_PATH = Path(os.environ.get('DB_PATH', str(Path(__file__).parent.parent / 'data' / 'dictionary.db')))
+
+# DSL_BASE: root folder that contains all DSL subdirectories.
+# Locally: C:\Users\PC\En-Ru   On Railway: /app/dsl
+_DSL_BASE_DEFAULT = str(Path(r'C:\Users\PC\En-Ru'))
+DSL_BASE = Path(os.environ.get('DSL_PATH', _DSL_BASE_DEFAULT))
 
 # ── Dictionary list ────────────────────────────────────────────────────────
-# Each entry: path = folder containing the DSL file (glob picks the largest
-# non-_abrv.dsl inside it). slug must be unique and stable.
+# rel_path: path relative to DSL_BASE that contains the DSL file.
+# The script globs *.dsl inside it and picks the largest non-_abrv file.
 
 DICTIONARIES = [
     # ── GENERAL / approved ───────────────────────────────────────────────────
@@ -29,7 +37,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "GENERAL",
-        "path": r"C:\Users\PC\En-Ru\En-Ru_Americana",
+        "rel_path": r"En-Ru_Americana",
     },
     {
         "slug": "mueller",
@@ -39,7 +47,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "GENERAL",
-        "path": r"C:\Users\PC\En-Ru\2Boff\Muller 24",
+        "rel_path": r"2Boff\Muller 24",
     },
     {
         "slug": "collins",
@@ -49,7 +57,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "GENERAL",
-        "path": r"C:\Users\PC\En-Ru\Universal\Collins",
+        "rel_path": r"Universal\Collins",
     },
     {
         "slug": "oxford",
@@ -59,7 +67,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "GENERAL",
-        "path": r"C:\Users\PC\En-Ru\Universal\Oxford",
+        "rel_path": r"Universal\Oxford",
     },
     {
         "slug": "courtney-phrasal",
@@ -69,7 +77,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "GENERAL",
-        "path": r"C:\Users\PC\En-Ru\Universal\Courtney - Phrasal Verbs",
+        "rel_path": r"Universal\Courtney - Phrasal Verbs",
     },
     # ── BIO / approved ────────────────────────────────────────────────────────
     {
@@ -80,7 +88,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Birds",
+        "rel_path": r"Special\ZOO\Birds",
     },
     {
         "slug": "zoo-fish",
@@ -90,7 +98,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Fish",
+        "rel_path": r"Special\ZOO\Fish",
     },
     {
         "slug": "zoo-insects",
@@ -100,7 +108,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Insects",
+        "rel_path": r"Special\ZOO\Insects",
     },
     {
         "slug": "zoo-mammals",
@@ -110,7 +118,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Mammals",
+        "rel_path": r"Special\ZOO\Mammals",
     },
     {
         "slug": "zoo-reptiles",
@@ -120,7 +128,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Reptiles",
+        "rel_path": r"Special\ZOO\Reptiles",
     },
     {
         "slug": "bio-general",
@@ -130,7 +138,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\BIO\Biology",
+        "rel_path": r"Special\BIO\Biology",
     },
     {
         "slug": "biotech",
@@ -140,7 +148,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\BIO\Biotech",
+        "rel_path": r"Special\BIO\Biotech",
     },
     {
         "slug": "plant-tissue",
@@ -150,7 +158,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "path": r"C:\Users\PC\En-Ru\Special\BIO\Plant tissue culture",
+        "rel_path": r"Special\BIO\Plant tissue culture",
     },
     # ── MED / approved ────────────────────────────────────────────────────────
     {
@@ -161,7 +169,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\WHO Vaccinology",
+        "rel_path": r"Special\MED\WHO Vaccinology",
     },
     # ── MED / caution ─────────────────────────────────────────────────────────
     {
@@ -172,7 +180,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\Medical - Ривкин",
+        "rel_path": r"Special\MED\Medical - Ривкин",
     },
     {
         "slug": "med-drozdov",
@@ -182,7 +190,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\Medicine General",
+        "rel_path": r"Special\MED\Medicine General",
     },
     {
         "slug": "pharmacopeia",
@@ -192,7 +200,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\Pharmacopeia",
+        "rel_path": r"Special\MED\Pharmacopeia",
     },
     {
         "slug": "psychology",
@@ -202,7 +210,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\Psychology",
+        "rel_path": r"Special\MED\Psychology",
     },
     {
         "slug": "med-akzhigitov",
@@ -212,7 +220,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\Медицина. Большой - Акжигитов",
+        "rel_path": r"Special\MED\Медицина. Большой - Акжигитов",
     },
     {
         "slug": "genetics",
@@ -222,7 +230,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\Генетика - Картель",
+        "rel_path": r"Special\MED\Генетика - Картель",
     },
     {
         "slug": "gcp",
@@ -232,7 +240,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "path": r"C:\Users\PC\En-Ru\Special\MED\Надлежащая клиническая практика",
+        "rel_path": r"Special\MED\Надлежащая клиническая практика",
     },
     # ── GEO / caution ─────────────────────────────────────────────────────────
     {
@@ -243,7 +251,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "path": r"C:\Users\PC\En-Ru\Special\GEO\Энциклопедия Дикого Запада",
+        "rel_path": r"Special\GEO\Энциклопедия Дикого Запада",
     },
     {
         "slug": "usa-toponyms",
@@ -253,7 +261,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "path": r"C:\Users\PC\En-Ru\Special\GEO\USA toponyms",
+        "rel_path": r"Special\GEO\USA toponyms",
     },
     {
         "slug": "aus-nz",
@@ -263,7 +271,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "path": r"C:\Users\PC\En-Ru\Special\GEO\Australia - New Zealand",
+        "rel_path": r"Special\GEO\Australia - New Zealand",
     },
     {
         "slug": "great-britain",
@@ -273,7 +281,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "path": r"C:\Users\PC\En-Ru\Special\GEO\Great Britain",
+        "rel_path": r"Special\GEO\Great Britain",
     },
     {
         "slug": "geonames",
@@ -283,7 +291,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "path": r"C:\Users\PC\En-Ru\Special\GEO\GeoNames",
+        "rel_path": r"Special\GEO\GeoNames",
     },
     # ── AVIA / caution ────────────────────────────────────────────────────────
     {
@@ -294,7 +302,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "AVIA",
-        "path": r"C:\Users\PC\En-Ru\Special\AVIA\Марасанов - Civil Aviation",
+        "rel_path": r"Special\AVIA\Марасанов - Civil Aviation",
     },
     {
         "slug": "avia-space",
@@ -304,7 +312,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "AVIA",
-        "path": r"C:\Users\PC\En-Ru\Special\AVIA\Мурашкевич - Avia & Space",
+        "rel_path": r"Special\AVIA\Мурашкевич - Avia & Space",
     },
     # ── TECH / caution ────────────────────────────────────────────────────────
     {
@@ -315,7 +323,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "TECH",
-        "path": r"C:\Users\PC\En-Ru\Special\AUTO\Transport",
+        "rel_path": r"Special\AUTO\Transport",
     },
     {
         "slug": "auto-terms",
@@ -325,7 +333,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "TECH",
-        "path": r"C:\Users\PC\En-Ru\Special\AUTO\Auto (Тверитнев)",
+        "rel_path": r"Special\AUTO\Auto (Тверитнев)",
     },
     {
         "slug": "antennas",
@@ -335,7 +343,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "TECH",
-        "path": r"C:\Users\PC\En-Ru\Special\BIO\Biotechnology",
+        "rel_path": r"Special\BIO\Biotechnology",
     },
     # ── CHEM / caution ────────────────────────────────────────────────────────
     {
@@ -346,7 +354,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "CHEM",
-        "path": r"C:\Users\PC\En-Ru\Special\CHEM\ChemTerms",
+        "rel_path": r"Special\CHEM\ChemTerms",
     },
     # ── ARTS / caution ────────────────────────────────────────────────────────
     {
@@ -357,7 +365,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "ARTS",
-        "path": r"C:\Users\PC\En-Ru\Special\ARTS\Театр. Перель",
+        "rel_path": r"Special\ARTS\Театр. Перель",
     },
     # ── AGRO / caution ────────────────────────────────────────────────────────
     {
@@ -368,7 +376,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "AGRO",
-        "path": r"C:\Users\PC\En-Ru\Special\AGRO\Агротехнологии - Адаменко",
+        "rel_path": r"Special\AGRO\Агротехнологии - Адаменко",
     },
     # ── OTHER / caution ───────────────────────────────────────────────────────
     {
@@ -379,7 +387,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "OTHER",
-        "path": r"C:\Users\PC\En-Ru\Mostitsky\Homophones",
+        "rel_path": r"Mostitsky\Homophones",
     },
     {
         "slug": "bank-cards",
@@ -389,7 +397,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "OTHER",
-        "path": r"C:\Users\PC\En-Ru\Special\COMP\Bank Cards",
+        "rel_path": r"Special\COMP\Bank Cards",
     },
 ]
 
@@ -578,7 +586,7 @@ def load_dictionary(con: sqlite3.Connection, cfg: dict) -> int:
         return 0
 
     # Find DSL file
-    directory = Path(cfg['path'])
+    directory = DSL_BASE / cfg['rel_path']
     if not directory.is_dir():
         print(f"  [ERROR] {cfg['name']}: directory not found: {directory}")
         return 0

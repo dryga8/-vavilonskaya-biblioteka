@@ -2,8 +2,11 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "bash scripts/startup.sh"
 healthcheckPath = "/"
 
 [[volumes]]
 mountPath = "/app/data"
+
+[[volumes]]
+mountPath = "/app/dsl"
