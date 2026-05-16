@@ -1,24 +1,399 @@
 #!/usr/bin/env python3
-"""Parse DSL dictionary file into SQLite with FTS5."""
+"""Parse DSL dictionary files into SQLite with FTS5.
+
+Usage:
+    python parse_dsl.py          # append new dictionaries (skips existing slugs)
+    python parse_dsl.py --reset  # drop and recreate the whole DB (including Americana!)
+"""
 
 import html as html_lib
 import re
 import sqlite3
+import sys
 import unicodedata
 from pathlib import Path
 
-DSL_FILE = Path(r"C:\Users\PC\En-Ru\En-Ru_Americana\AmericanaEnRu.dsl")
 DB_PATH = Path(__file__).parent.parent / "data" / "dictionary.db"
 
-DICTIONARY = {
-    "slug": "americana",
-    "name": "Americana (En-Ru)",
-    "description": "Энциклопедический словарь американской культуры",
-    "color": "#534AB7",
-    "language": "en",
-    "reliability": "approved",
-    "field": "GENERAL",
-}
+# ── Dictionary list ────────────────────────────────────────────────────────
+# Each entry: path = folder containing the DSL file (glob picks the largest
+# non-_abrv.dsl inside it). slug must be unique and stable.
+
+DICTIONARIES = [
+    # ── GENERAL / approved ───────────────────────────────────────────────────
+    {
+        "slug": "americana",
+        "name": "Americana (En-Ru)",
+        "description": "Энциклопедический словарь американской культуры",
+        "color": "#534AB7",
+        "language": "en",
+        "reliability": "approved",
+        "field": "GENERAL",
+        "path": r"C:\Users\PC\En-Ru\En-Ru_Americana",
+    },
+    {
+        "slug": "mueller",
+        "name": "Мюллер",
+        "description": "",
+        "color": "#8B3A2A",
+        "language": "en",
+        "reliability": "approved",
+        "field": "GENERAL",
+        "path": r"C:\Users\PC\En-Ru\2Boff\Muller 24",
+    },
+    {
+        "slug": "collins",
+        "name": "Коллинз",
+        "description": "",
+        "color": "#6C3483",
+        "language": "en",
+        "reliability": "approved",
+        "field": "GENERAL",
+        "path": r"C:\Users\PC\En-Ru\Universal\Collins",
+    },
+    {
+        "slug": "oxford",
+        "name": "Oxford",
+        "description": "",
+        "color": "#1A5276",
+        "language": "en",
+        "reliability": "approved",
+        "field": "GENERAL",
+        "path": r"C:\Users\PC\En-Ru\Universal\Oxford",
+    },
+    {
+        "slug": "courtney-phrasal",
+        "name": "Courtney. Phrasal Verbs",
+        "description": "",
+        "color": "#2E4057",
+        "language": "en",
+        "reliability": "approved",
+        "field": "GENERAL",
+        "path": r"C:\Users\PC\En-Ru\Universal\Courtney - Phrasal Verbs",
+    },
+    # ── BIO / approved ────────────────────────────────────────────────────────
+    {
+        "slug": "zoo-birds",
+        "name": "5-язычный словарь. Птицы",
+        "description": "",
+        "color": "#1a6b3a",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Birds",
+    },
+    {
+        "slug": "zoo-fish",
+        "name": "5-язычный словарь. Рыбы",
+        "description": "",
+        "color": "#1a4a6b",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Fish",
+    },
+    {
+        "slug": "zoo-insects",
+        "name": "5-язычный словарь. Насекомые",
+        "description": "",
+        "color": "#4a6b1a",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Insects",
+    },
+    {
+        "slug": "zoo-mammals",
+        "name": "5-язычный словарь. Млекопитающие",
+        "description": "",
+        "color": "#6b3a1a",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Mammals",
+    },
+    {
+        "slug": "zoo-reptiles",
+        "name": "5-язычный словарь. Рептилии",
+        "description": "",
+        "color": "#3a6b1a",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\ZOO\Reptiles",
+    },
+    {
+        "slug": "bio-general",
+        "name": "Биологический словарь",
+        "description": "",
+        "color": "#2d5a27",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\BIO\Biology",
+    },
+    {
+        "slug": "biotech",
+        "name": "Биотехнологии",
+        "description": "",
+        "color": "#1a5c3a",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\BIO\Biotech",
+    },
+    {
+        "slug": "plant-tissue",
+        "name": "Культура тканей растений",
+        "description": "",
+        "color": "#3a5c1a",
+        "language": "en",
+        "reliability": "approved",
+        "field": "BIO",
+        "path": r"C:\Users\PC\En-Ru\Special\BIO\Plant tissue culture",
+    },
+    # ── MED / approved ────────────────────────────────────────────────────────
+    {
+        "slug": "who-vaccinology",
+        "name": "Вакцинология ВОЗ",
+        "description": "",
+        "color": "#1a3a6b",
+        "language": "en",
+        "reliability": "approved",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\WHO Vaccinology",
+    },
+    # ── MED / caution ─────────────────────────────────────────────────────────
+    {
+        "slug": "med-rivkin",
+        "name": "Медицинский словарь. Ривкин",
+        "description": "",
+        "color": "#5c2d1a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\Medical - Ривкин",
+    },
+    {
+        "slug": "med-drozdov",
+        "name": "Медицина. Дроздов",
+        "description": "",
+        "color": "#6b1a2d",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\Medicine General",
+    },
+    {
+        "slug": "pharmacopeia",
+        "name": "Фармакопея",
+        "description": "",
+        "color": "#4a1a5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\Pharmacopeia",
+    },
+    {
+        "slug": "psychology",
+        "name": "Психология",
+        "description": "",
+        "color": "#1a4a5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\Psychology",
+    },
+    {
+        "slug": "med-akzhigitov",
+        "name": "Медицина. Акжигитов",
+        "description": "",
+        "color": "#5c1a1a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\Медицина. Большой - Акжигитов",
+    },
+    {
+        "slug": "genetics",
+        "name": "Генетика. Картель",
+        "description": "",
+        "color": "#2d1a5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\Генетика - Картель",
+    },
+    {
+        "slug": "gcp",
+        "name": "Надлежащая клиническая практика",
+        "description": "",
+        "color": "#1a5c5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "path": r"C:\Users\PC\En-Ru\Special\MED\Надлежащая клиническая практика",
+    },
+    # ── GEO / caution ─────────────────────────────────────────────────────────
+    {
+        "slug": "wild-west",
+        "name": "Энциклопедия Дикого Запада",
+        "description": "",
+        "color": "#5c3a1a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "GEO",
+        "path": r"C:\Users\PC\En-Ru\Special\GEO\Энциклопедия Дикого Запада",
+    },
+    {
+        "slug": "usa-toponyms",
+        "name": "Топонимы США",
+        "description": "",
+        "color": "#1a3a5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "GEO",
+        "path": r"C:\Users\PC\En-Ru\Special\GEO\USA toponyms",
+    },
+    {
+        "slug": "aus-nz",
+        "name": "Австралия и Новая Зеландия",
+        "description": "",
+        "color": "#1a5c4a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "GEO",
+        "path": r"C:\Users\PC\En-Ru\Special\GEO\Australia - New Zealand",
+    },
+    {
+        "slug": "great-britain",
+        "name": "Великобритания",
+        "description": "",
+        "color": "#2d1a5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "GEO",
+        "path": r"C:\Users\PC\En-Ru\Special\GEO\Great Britain",
+    },
+    {
+        "slug": "geonames",
+        "name": "GeoNames. Топонимы",
+        "description": "",
+        "color": "#3a3a5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "GEO",
+        "path": r"C:\Users\PC\En-Ru\Special\GEO\GeoNames",
+    },
+    # ── AVIA / caution ────────────────────────────────────────────────────────
+    {
+        "slug": "civil-aviation",
+        "name": "Гражданская авиация. Марасанов",
+        "description": "",
+        "color": "#1a2d5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "AVIA",
+        "path": r"C:\Users\PC\En-Ru\Special\AVIA\Марасанов - Civil Aviation",
+    },
+    {
+        "slug": "avia-space",
+        "name": "Авиационно-космический словарь",
+        "description": "",
+        "color": "#2d1a4a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "AVIA",
+        "path": r"C:\Users\PC\En-Ru\Special\AVIA\Мурашкевич - Avia & Space",
+    },
+    # ── TECH / caution ────────────────────────────────────────────────────────
+    {
+        "slug": "transport",
+        "name": "Машиностроение. Косов",
+        "description": "",
+        "color": "#3a3a1a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "TECH",
+        "path": r"C:\Users\PC\En-Ru\Special\AUTO\Transport",
+    },
+    {
+        "slug": "auto-terms",
+        "name": "Автомобильные термины",
+        "description": "",
+        "color": "#4a3a1a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "TECH",
+        "path": r"C:\Users\PC\En-Ru\Special\AUTO\Auto (Тверитнев)",
+    },
+    {
+        "slug": "antennas",
+        "name": "Антенны. Резников",
+        "description": "",
+        "color": "#3a1a3a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "TECH",
+        "path": r"C:\Users\PC\En-Ru\Special\BIO\Biotechnology",
+    },
+    # ── CHEM / caution ────────────────────────────────────────────────────────
+    {
+        "slug": "chem-terms",
+        "name": "Химические термины",
+        "description": "",
+        "color": "#1a3a3a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "CHEM",
+        "path": r"C:\Users\PC\En-Ru\Special\CHEM\ChemTerms",
+    },
+    # ── ARTS / caution ────────────────────────────────────────────────────────
+    {
+        "slug": "theatre",
+        "name": "Театральный словарь. Перель",
+        "description": "",
+        "color": "#5c1a3a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "ARTS",
+        "path": r"C:\Users\PC\En-Ru\Special\ARTS\Театр. Перель",
+    },
+    # ── AGRO / caution ────────────────────────────────────────────────────────
+    {
+        "slug": "agro",
+        "name": "Агротехнологии. Адаменко",
+        "description": "",
+        "color": "#2d5c1a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "AGRO",
+        "path": r"C:\Users\PC\En-Ru\Special\AGRO\Агротехнологии - Адаменко",
+    },
+    # ── OTHER / caution ───────────────────────────────────────────────────────
+    {
+        "slug": "homophones",
+        "name": "Омофоны. Мостицкий",
+        "description": "",
+        "color": "#3a2d5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "OTHER",
+        "path": r"C:\Users\PC\En-Ru\Mostitsky\Homophones",
+    },
+    {
+        "slug": "bank-cards",
+        "name": "Банковские карты",
+        "description": "",
+        "color": "#1a4a3a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "OTHER",
+        "path": r"C:\Users\PC\En-Ru\Special\COMP\Bank Cards",
+    },
+]
+
+# ── Regex helpers ──────────────────────────────────────────────────────────
 
 TAG_RE = re.compile(r'\[/?[^\]]*?\]')
 REF_RE = re.compile(r'<<([^>]+)>>')
@@ -29,16 +404,10 @@ _TRAILING_FW = re.compile(
 
 
 def strip_tags(text: str) -> str:
-    # {X} → X  (DSL escapes for special chars like {"}  {"})
     text = re.sub(r'\{([^}]+)\}', r'\1', text)
-    # Protect \[ and \] (literal brackets) before tag stripping
     text = text.replace(r'\[', '\x00LB\x00').replace(r'\]', '\x00RB\x00')
-    # Remove all [tag] / [/tag]
     text = TAG_RE.sub('', text)
-    # <<Reference>> is preserved here; linkify_body() converts it to <a> later
-    # Restore literal brackets
     text = text.replace('\x00LB\x00', '[').replace('\x00RB\x00', ']')
-    # collapse multiple spaces/tabs
     text = re.sub(r'[ \t]+', ' ', text)
     return text.strip()
 
@@ -57,7 +426,6 @@ def slugify(title: str, seen: set) -> str:
 
 
 def slugify_ref(title: str) -> str:
-    """Slugify a cross-reference title (no dedup — used for href generation only)."""
     s = title.lower().strip()
     s = unicodedata.normalize('NFKD', s)
     s = ''.join(c for c in s if not unicodedata.combining(c))
@@ -65,7 +433,6 @@ def slugify_ref(title: str) -> str:
 
 
 def linkify_body(text: str, dict_slug: str) -> str:
-    """Convert <<ref>> and *Word cross-references to HTML anchor tags."""
     def repl_ref(m):
         ref = m.group(1).strip()
         return f'<a href="/{dict_slug}/{slugify_ref(ref)}">{html_lib.escape(ref)}</a>'
@@ -82,7 +449,6 @@ def linkify_body(text: str, dict_slug: str) -> str:
 
 
 def first_letter(title: str) -> str:
-    # digits → '#'; find first alpha or digit
     for ch in title:
         if ch.isalpha():
             return ch.upper()
@@ -91,18 +457,40 @@ def first_letter(title: str) -> str:
     return '#'
 
 
-def parse_dsl(path: Path):
-    """Yield (headwords_list, body_text) tuples."""
-    with open(path, encoding='utf-8-sig') as f:  # utf-8-sig strips BOM if present
-        lines = f.readlines()
+# ── File helpers ───────────────────────────────────────────────────────────
 
+def find_dsl_file(directory: Path) -> Path | None:
+    """Return the largest non-abrv DSL file in *directory* (non-recursive)."""
+    candidates = [
+        f for f in directory.glob('*.dsl')
+        if not f.stem.lower().endswith('_abrv')
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda f: f.stat().st_size)
+
+
+def read_dsl_lines(path: Path) -> list[str]:
+    """Read DSL file, trying several encodings in order."""
+    for enc in ('utf-8-sig', 'utf-16', 'cp1251', 'latin-1'):
+        try:
+            with open(path, encoding=enc) as f:
+                return f.readlines()
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    return []
+
+
+# ── Parser ─────────────────────────────────────────────────────────────────
+
+def parse_dsl(lines: list[str]):
+    """Yield (headwords_list, body_text) tuples from pre-read DSL lines."""
     headwords: list[str] = []
     body_lines: list[str] = []
 
     def flush():
         if not headwords:
             return
-        # pick first non-underscore headword as primary
         visible = [h for h in headwords if not h.startswith('_')]
         if not visible:
             return
@@ -116,7 +504,6 @@ def parse_dsl(path: Path):
             continue
 
         if not line.strip():
-            # blank line → flush entry
             yield from flush()
             headwords.clear()
             body_lines.clear()
@@ -125,7 +512,6 @@ def parse_dsl(path: Path):
             if cleaned:
                 body_lines.append(cleaned)
         else:
-            # headword line; if we already have body, this is a new entry
             if body_lines:
                 yield from flush()
                 headwords.clear()
@@ -135,16 +521,13 @@ def parse_dsl(path: Path):
     yield from flush()
 
 
-def build_db(db_path: Path):
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    if db_path.exists():
-        db_path.unlink()
+# ── Schema ─────────────────────────────────────────────────────────────────
 
-    con = sqlite3.connect(db_path)
+def ensure_schema(con: sqlite3.Connection) -> None:
     con.executescript("""
         PRAGMA journal_mode=WAL;
 
-        CREATE TABLE dictionaries (
+        CREATE TABLE IF NOT EXISTS dictionaries (
             id          INTEGER PRIMARY KEY,
             slug        TEXT UNIQUE NOT NULL,
             name        TEXT NOT NULL,
@@ -156,7 +539,7 @@ def build_db(db_path: Path):
             field       TEXT
         );
 
-        CREATE TABLE entries (
+        CREATE TABLE IF NOT EXISTS entries (
             id            INTEGER PRIMARY KEY,
             dictionary_id INTEGER NOT NULL REFERENCES dictionaries(id),
             slug          TEXT NOT NULL,
@@ -166,82 +549,135 @@ def build_db(db_path: Path):
             UNIQUE(dictionary_id, slug)
         );
 
-        CREATE VIRTUAL TABLE entries_fts USING fts5(
+        CREATE VIRTUAL TABLE IF NOT EXISTS entries_fts USING fts5(
             title,
             body,
             content=entries,
             content_rowid=id
         );
 
-        CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN
+        CREATE TRIGGER IF NOT EXISTS entries_ai AFTER INSERT ON entries BEGIN
             INSERT INTO entries_fts(rowid, title, body)
             VALUES (new.id, new.title, new.body);
         END;
     """)
 
+
+# ── Loader ─────────────────────────────────────────────────────────────────
+
+def load_dictionary(con: sqlite3.Connection, cfg: dict) -> int:
+    slug = cfg['slug']
+
+    # Skip if already in DB
+    row = con.execute("SELECT id FROM dictionaries WHERE slug=?", (slug,)).fetchone()
+    if row:
+        count = con.execute(
+            "SELECT entry_count FROM dictionaries WHERE slug=?", (slug,)
+        ).fetchone()[0]
+        print(f"  [skip] {cfg['name']}: already in db ({count:,} entries)")
+        return 0
+
+    # Find DSL file
+    directory = Path(cfg['path'])
+    if not directory.is_dir():
+        print(f"  [ERROR] {cfg['name']}: directory not found: {directory}")
+        return 0
+
+    dsl_file = find_dsl_file(directory)
+    if dsl_file is None:
+        print(f"  [ERROR] {cfg['name']}: no DSL file in {directory}")
+        return 0
+
+    print(f"  Файл: {dsl_file.name} ({dsl_file.stat().st_size // 1024:,} KB)", flush=True)
+
+    lines = read_dsl_lines(dsl_file)
+    if not lines:
+        print(f"  [ERROR] {cfg['name']}: could not read file")
+        return 0
+
+    # Insert dictionary record
     con.execute(
         "INSERT INTO dictionaries(slug, name, description, color, language, reliability, field)"
         " VALUES(?,?,?,?,?,?,?)",
-        (DICTIONARY['slug'], DICTIONARY['name'], DICTIONARY['description'],
-         DICTIONARY['color'], DICTIONARY['language'],
-         DICTIONARY.get('reliability'), DICTIONARY.get('field')),
+        (slug, cfg['name'], cfg.get('description', ''),
+         cfg['color'], cfg.get('language', 'en'),
+         cfg.get('reliability'), cfg.get('field')),
     )
     dict_id = con.execute("SELECT last_insert_rowid()").fetchone()[0]
 
     seen_slugs: set[str] = set()
     count = 0
 
-    for headwords, body in parse_dsl(DSL_FILE):
+    for headwords, body in parse_dsl(lines):
         primary = strip_tags(headwords[0])
-        # skip entries with no alphanumeric content (e.g. bare "...")
         if not primary or not any(c.isalnum() for c in primary):
             continue
 
-        # embed alt headwords into body so FTS finds them too
         alts = [strip_tags(h) for h in headwords[1:] if strip_tags(h)]
-        linked_body = linkify_body(body, DICTIONARY['slug'])
-        if alts:
-            full_body = ('= ' + '; '.join(alts) + '\n' + linked_body).strip()
-        else:
-            full_body = linked_body
+        linked_body = linkify_body(body, slug)
+        full_body = ('= ' + '; '.join(alts) + '\n' + linked_body).strip() if alts else linked_body
 
-        slug = slugify(primary, seen_slugs)
+        entry_slug = slugify(primary, seen_slugs)
         letter = first_letter(primary)
 
         con.execute(
-            "INSERT INTO entries(dictionary_id, slug, title, body, letter) VALUES(?,?,?,?,?)",
-            (dict_id, slug, primary, full_body, letter),
+            "INSERT OR IGNORE INTO entries(dictionary_id, slug, title, body, letter)"
+            " VALUES(?,?,?,?,?)",
+            (dict_id, entry_slug, primary, full_body, letter),
         )
         count += 1
-        if count % 2000 == 0:
+        if count % 5000 == 0:
             con.commit()
-            print(f"  {count} entries...")
+            print(f"    {count:,} статей...", flush=True)
 
     con.execute("UPDATE dictionaries SET entry_count=? WHERE id=?", (count, dict_id))
     con.commit()
-    con.close()
     return count
 
 
-def preview(db_path: Path, n: int = 5):
-    con = sqlite3.connect(db_path)
-    rows = con.execute(
-        "SELECT title, letter, body FROM entries ORDER BY id LIMIT ?", (n,)
-    ).fetchall()
+# ── Main ───────────────────────────────────────────────────────────────────
+
+def run(reset: bool = False) -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    if reset and DB_PATH.exists():
+        DB_PATH.unlink()
+        print("База данных удалена, создаю заново.\n")
+
+    con = sqlite3.connect(DB_PATH)
+    ensure_schema(con)
+
+    grand_total = 0
+    for cfg in DICTIONARIES:
+        print(f"\nЗагружаю «{cfg['name']}»...")
+        n = load_dictionary(con, cfg)
+        if n > 0:
+            print(f"  [OK] {cfg['name']}: {n:,} entries loaded")
+        grand_total += n
+
     con.close()
+
+    # Summary
+    con2 = sqlite3.connect(DB_PATH)
+    rows = con2.execute(
+        "SELECT name, entry_count, field, reliability FROM dictionaries ORDER BY field, name"
+    ).fetchall()
+    con2.close()
+
     print(f"\n{'='*60}")
-    print(f"First {n} entries:")
-    print('='*60)
-    for title, letter, body in rows:
-        print(f"\n[{letter}] {title}")
-        snippet = (body or '')[:200].replace('\n', ' ')
-        if len(body or '') > 200:
-            snippet += '…'
-        print(f"    {snippet}")
+    print(f"Итого новых статей добавлено: {grand_total:,}")
+    print(f"{'='*60}")
+    print(f"{'Словарь':<40} {'Статей':>8}  {'Поле':<8} {'Надёжность'}")
+    print('-' * 70)
+    total_entries = 0
+    for name, entry_count, field, reliability in rows:
+        display = name[:38]
+        print(f"{display:<40} {entry_count:>8,}  {field or '?':<8} {reliability or '—'}")
+        total_entries += entry_count
+    print('-' * 70)
+    print(f"{'ВСЕГО':<40} {total_entries:>8,}")
 
 
 if __name__ == '__main__':
-    print(f"Parsing {DSL_FILE} …")
-    total = build_db(DB_PATH)
-    print(f"Done -- {total} entries -> {DB_PATH}")
-    preview(DB_PATH)
+    reset = '--reset' in sys.argv
+    run(reset=reset)

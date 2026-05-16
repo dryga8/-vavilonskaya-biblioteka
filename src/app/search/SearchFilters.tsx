@@ -12,11 +12,12 @@ const FIELD_LABELS: Record<string, string> = {
   CHEM: 'Химия',
   TECH: 'Технологии',
   ARTS: 'Искусство',
+  AGRO: 'Агрономия',
   FIN: 'Финансы',
   OTHER: 'Прочее',
 };
 
-const FIELD_ORDER = ['GENERAL', 'BIO', 'MED', 'GEO', 'AVIA', 'CHEM', 'TECH', 'ARTS', 'FIN', 'OTHER'];
+const FIELD_ORDER = ['GENERAL', 'BIO', 'MED', 'GEO', 'AVIA', 'CHEM', 'TECH', 'ARTS', 'AGRO', 'FIN', 'OTHER'];
 
 export default function SearchFilters({
   dicts,
