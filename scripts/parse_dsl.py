@@ -417,6 +417,8 @@ STAR_REF_RE = re.compile(r'\*([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё \t\-,\
 _TRAILING_FW = re.compile(
     r'\s+(?:and|or|the|of|in|to|a|an|see|also)\s*$', re.IGNORECASE
 )
+_LANG_LINE_RE = re.compile(r'\[p\](LAT|RUS|ENG|DEU|FRA)\[/p\]')
+_TRN_RE = re.compile(r'\[trn\](.*?)\[/trn\]', re.DOTALL)
 
 
 def strip_tags(text: str) -> str:
@@ -473,7 +475,59 @@ def first_letter(title: str) -> str:
     return '#'
 
 
-# ── File helpers ───────────────────────────────────────────────────────────
+# ── Zoo helpers ────────────────────────────────────────────────────────────
+
+def parse_dsl_raw(lines: list[str]):
+    """Like parse_dsl but yields (headwords, raw_body_lines) without stripping tags."""
+    headwords: list[str] = []
+    body_lines: list[str] = []
+
+    def flush():
+        if not headwords:
+            return
+        visible = [h for h in headwords if not h.startswith('_')]
+        if not visible:
+            return
+        yield visible, list(body_lines)
+
+    for raw in lines:
+        line = raw.rstrip('\r\n')
+        if line.startswith('#') or line.strip() == '**':
+            continue
+        if not line.strip():
+            yield from flush()
+            headwords.clear()
+            body_lines.clear()
+        elif line.startswith('\t'):
+            body_lines.append(line.lstrip('\t').strip())
+        else:
+            if body_lines:
+                yield from flush()
+                headwords.clear()
+                body_lines.clear()
+            headwords.append(line.strip())
+
+    yield from flush()
+
+
+def extract_zoo_langs(raw_body_lines: list[str]) -> dict[str, str]:
+    """Extract {LAT, RUS, ENG, DEU, FRA} from zoo DSL body lines."""
+    result: dict[str, str] = {}
+    for line in raw_body_lines:
+        lang_m = _LANG_LINE_RE.search(line)
+        if not lang_m:
+            continue
+        lang = lang_m.group(1)
+        trn_m = _TRN_RE.search(line)
+        if not trn_m:
+            continue
+        text = re.sub(r'\s+', ' ', strip_tags(trn_m.group(1))).strip()
+        if text:
+            result[lang] = text
+    return result
+
+
+# ── File helpers ────────────────────────────────────────────────────────────
 
 def read_dsl_lines(path: Path) -> list[str]:
     """Read DSL file, trying several encodings in order."""
@@ -565,6 +619,11 @@ def ensure_schema(con: sqlite3.Connection) -> None:
             INSERT INTO entries_fts(rowid, title, body)
             VALUES (new.id, new.title, new.body);
         END;
+
+        CREATE TRIGGER IF NOT EXISTS entries_ad AFTER DELETE ON entries BEGIN
+            INSERT INTO entries_fts(entries_fts, rowid, title, body)
+            VALUES ('delete', old.id, old.title, old.body);
+        END;
     """)
 
 
@@ -607,57 +666,91 @@ def load_dictionary(con: sqlite3.Connection, cfg: dict) -> int:
 
     seen_slugs: set[str] = set()
     count = 0
+    is_zoo = slug.startswith('zoo-')
 
-    for headwords, body in parse_dsl(lines):
-        primary = strip_tags(headwords[0])
-        if not primary or not any(c.isalnum() for c in primary):
-            continue
+    if is_zoo:
+        for headwords, raw_body_lines in parse_dsl_raw(lines):
+            langs = extract_zoo_langs(raw_body_lines)
+            eng = langs.get('ENG', '').strip()
+            if not eng or eng == '—':
+                continue
 
-        alts = [strip_tags(h) for h in headwords[1:] if strip_tags(h)]
-        linked_body = linkify_body(body, slug)
-        full_body = ('= ' + '; '.join(alts) + '\n' + linked_body).strip() if alts else linked_body
+            lat = langs.get('LAT', '')
+            rus = langs.get('RUS', '')
+            deu = langs.get('DEU', '')
+            fra = langs.get('FRA', '')
 
-        entry_slug = slugify(primary, seen_slugs)
-        letter = first_letter(primary)
+            title = eng
+            body = ' | '.join(
+                f"{lang}: {val}"
+                for lang, val in [('LAT', lat), ('RUS', rus), ('ENG', eng), ('DEU', deu), ('FRA', fra)]
+                if val and val != '—'
+            )
 
-        con.execute(
-            "INSERT OR IGNORE INTO entries(dictionary_id, slug, title, body, letter)"
-            " VALUES(?,?,?,?,?)",
-            (dict_id, entry_slug, primary, full_body, letter),
-        )
-        count += 1
-        if count % 5000 == 0:
-            con.commit()
-            print(f"    {count:,} статей...", flush=True)
+            entry_slug = slugify(title, seen_slugs)
+            letter = first_letter(title)
+
+            con.execute(
+                "INSERT OR IGNORE INTO entries(dictionary_id, slug, title, body, letter)"
+                " VALUES(?,?,?,?,?)",
+                (dict_id, entry_slug, title, body, letter),
+            )
+            count += 1
+            if count % 5000 == 0:
+                con.commit()
+                print(f"    {count:,} статей...", flush=True)
+    else:
+        for headwords, body in parse_dsl(lines):
+            primary = strip_tags(headwords[0])
+            if not primary or not any(c.isalnum() for c in primary):
+                continue
+
+            alts = [strip_tags(h) for h in headwords[1:] if strip_tags(h)]
+            linked_body = linkify_body(body, slug)
+            full_body = ('= ' + '; '.join(alts) + '\n' + linked_body).strip() if alts else linked_body
+
+            entry_slug = slugify(primary, seen_slugs)
+            letter = first_letter(primary)
+
+            con.execute(
+                "INSERT OR IGNORE INTO entries(dictionary_id, slug, title, body, letter)"
+                " VALUES(?,?,?,?,?)",
+                (dict_id, entry_slug, primary, full_body, letter),
+            )
+            count += 1
+            if count % 5000 == 0:
+                con.commit()
+                print(f"    {count:,} статей...", flush=True)
 
     con.execute("UPDATE dictionaries SET entry_count=? WHERE id=?", (count, dict_id))
     con.commit()
     return count
 
 
+# ── Zoo reload ─────────────────────────────────────────────────────────────
+
+def _delete_zoo_dicts(con: sqlite3.Connection) -> None:
+    """Remove all zoo-* dictionaries so they can be re-imported cleanly."""
+    zoo_slugs = [d['slug'] for d in DICTIONARIES if d['slug'].startswith('zoo-')]
+    for slug in zoo_slugs:
+        row = con.execute("SELECT id FROM dictionaries WHERE slug=?", (slug,)).fetchone()
+        if not row:
+            print(f"  {slug} — не найден в БД, пропускаю")
+            continue
+        dict_id = row[0]
+        n = con.execute(
+            "SELECT COUNT(*) FROM entries WHERE dictionary_id=?", (dict_id,)
+        ).fetchone()[0]
+        # DELETE trigger (entries_ad) handles FTS cleanup row-by-row
+        con.execute("DELETE FROM entries WHERE dictionary_id=?", (dict_id,))
+        con.execute("DELETE FROM dictionaries WHERE id=?", (dict_id,))
+        con.commit()
+        print(f"  Удалён: {slug} ({n:,} статей)")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────
 
-def run(reset: bool = False) -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    if reset and DB_PATH.exists():
-        DB_PATH.unlink()
-        print("База данных удалена, создаю заново.\n")
-
-    con = sqlite3.connect(DB_PATH)
-    ensure_schema(con)
-
-    grand_total = 0
-    for cfg in DICTIONARIES:
-        print(f"\nЗагружаю «{cfg['name']}»...")
-        n = load_dictionary(con, cfg)
-        if n > 0:
-            print(f"  [OK] {cfg['name']}: {n:,} entries loaded")
-        grand_total += n
-
-    con.close()
-
-    # Summary
+def _print_summary(grand_total: int) -> None:
     con2 = sqlite3.connect(DB_PATH)
     rows = con2.execute(
         "SELECT name, entry_count, field, reliability FROM dictionaries ORDER BY field, name"
@@ -678,6 +771,47 @@ def run(reset: bool = False) -> None:
     print(f"{'ВСЕГО':<40} {total_entries:>8,}")
 
 
+def run(reset: bool = False, rezoo: bool = False) -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    if rezoo:
+        print("Перепарсиваю zoo-* словари...\n")
+        con = sqlite3.connect(DB_PATH)
+        ensure_schema(con)
+        _delete_zoo_dicts(con)
+        grand_total = 0
+        for cfg in DICTIONARIES:
+            if not cfg['slug'].startswith('zoo-'):
+                continue
+            print(f"\nЗагружаю «{cfg['name']}»...")
+            n = load_dictionary(con, cfg)
+            if n > 0:
+                print(f"  [OK] {cfg['name']}: {n:,} entries loaded")
+            grand_total += n
+        con.close()
+        _print_summary(grand_total)
+        return
+
+    if reset and DB_PATH.exists():
+        DB_PATH.unlink()
+        print("База данных удалена, создаю заново.\n")
+
+    con = sqlite3.connect(DB_PATH)
+    ensure_schema(con)
+
+    grand_total = 0
+    for cfg in DICTIONARIES:
+        print(f"\nЗагружаю «{cfg['name']}»...")
+        n = load_dictionary(con, cfg)
+        if n > 0:
+            print(f"  [OK] {cfg['name']}: {n:,} entries loaded")
+        grand_total += n
+
+    con.close()
+    _print_summary(grand_total)
+
+
 if __name__ == '__main__':
     reset = '--reset' in sys.argv
-    run(reset=reset)
+    rezoo = '--rezoo' in sys.argv
+    run(reset=reset, rezoo=rezoo)
