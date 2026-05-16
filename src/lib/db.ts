@@ -44,6 +44,7 @@ export interface GlobalSearchGroup {
   dict: Dictionary;
   results: SearchResult[];
   totalCount: number;
+  hasMore: boolean;
 }
 
 export interface Entry {
@@ -159,43 +160,38 @@ export function globalSearch(query: string, dictSlugs?: string[]): GlobalSearchG
     dicts = dicts.filter((d) => dictSlugs.includes(d.slug));
   }
 
+  const titleStmt = db.prepare(
+    `SELECT e.*, fts.rank FROM entries e
+     JOIN entries_fts fts ON fts.rowid = e.id
+     WHERE e.dictionary_id = ? AND entries_fts MATCH ?
+     ORDER BY fts.rank LIMIT 6`,
+  );
+  const bodyStmt = db.prepare(
+    `SELECT e.*, fts.rank FROM entries e
+     JOIN entries_fts fts ON fts.rowid = e.id
+     WHERE e.dictionary_id = ? AND entries_fts MATCH ?
+     ORDER BY fts.rank LIMIT 6`,
+  );
+
   const groups: GlobalSearchGroup[] = [];
+  let totalSoFar = 0;
 
   for (const dict of dicts) {
-    const inTitle = db
-      .prepare(
-        `SELECT e.*, fts.rank FROM entries e
-         JOIN entries_fts fts ON fts.rowid = e.id
-         WHERE e.dictionary_id = ? AND entries_fts MATCH ?
-         ORDER BY fts.rank LIMIT 5`,
-      )
-      .all(dict.id, `title:${q}*`) as SearchResult[];
+    if (totalSoFar >= 200) break;
 
+    const inTitle = titleStmt.all(dict.id, `title:${q}*`) as SearchResult[];
     const titleIds = new Set(inTitle.map((r) => r.id));
 
-    const allRows = db
-      .prepare(
-        `SELECT e.*, fts.rank FROM entries e
-         JOIN entries_fts fts ON fts.rowid = e.id
-         WHERE e.dictionary_id = ? AND entries_fts MATCH ?
-         ORDER BY fts.rank LIMIT 10`,
-      )
-      .all(dict.id, `${q}*`) as SearchResult[];
+    const bodyRows = bodyStmt.all(dict.id, `${q}*`) as SearchResult[];
+    const inBody = bodyRows.filter((r) => !titleIds.has(r.id));
 
-    const inBody = allRows.filter((r) => !titleIds.has(r.id));
-    const results = [...inTitle, ...inBody].slice(0, 5);
+    const combined = [...inTitle, ...inBody].slice(0, 5);
+    if (combined.length === 0) continue;
 
-    if (results.length === 0) continue;
+    const hasMore = inTitle.length >= 6 || (inTitle.length + inBody.length) > 5;
 
-    const { cnt } = db
-      .prepare(
-        `SELECT COUNT(*) as cnt FROM entries e
-         JOIN entries_fts fts ON fts.rowid = e.id
-         WHERE e.dictionary_id = ? AND entries_fts MATCH ?`,
-      )
-      .get(dict.id, `${q}*`) as { cnt: number };
-
-    groups.push({ dict, results, totalCount: cnt });
+    groups.push({ dict, results: combined, totalCount: combined.length, hasMore });
+    totalSoFar += combined.length;
   }
 
   return groups;

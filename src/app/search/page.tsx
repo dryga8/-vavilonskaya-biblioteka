@@ -1,25 +1,13 @@
+'use client';
+
 export const dynamic = 'force-dynamic';
 
-import {
-  getDictionaries,
-  globalSearch,
-  isDatabaseAvailable,
-  type Dictionary,
-  type GlobalSearchGroup,
-  type SearchResult,
-} from '@/lib/db';
+import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import type { Dictionary, GlobalSearchGroup, SearchResult } from '@/lib/db';
 import { ReliabilityBadge } from '@/components/ReliabilityBadge';
 import SearchPageBox from './SearchPageBox';
 import SearchFilters from './SearchFilters';
-
-interface Props {
-  searchParams: { q?: string; dicts?: string };
-}
-
-export async function generateMetadata({ searchParams }: Props) {
-  const q = searchParams.q?.trim();
-  return { title: q ? `Поиск: ${q}` : 'Глобальный поиск' };
-}
 
 // ── Result entry row ───────────────────────────────────────────────────────
 
@@ -72,13 +60,11 @@ function DictGroup({
   query: string;
   backUrl: string;
 }) {
-  const { dict, results, totalCount } = group;
+  const { dict, results, hasMore } = group;
   const displayName = dict.name.replace(/\s*\([^)]*-[^)]*\)\s*$/, '');
-  const hasMore = totalCount > results.length;
 
   return (
     <div className="card-parchment">
-      {/* Group header */}
       <div
         className="flex items-center justify-between px-5 py-3"
         style={{ borderBottom: '1px solid #DDD8CC', background: 'rgba(201,168,76,0.06)' }}
@@ -89,7 +75,7 @@ function DictGroup({
             {displayName}
           </span>
           <span className="text-[11px] font-mono" style={{ color: '#4A4A6A' }}>
-            {totalCount.toLocaleString('ru-RU')} {pluralResults(totalCount)}
+            {results.length} {pluralResults(results.length)}
           </span>
           {dict.reliability && (
             <ReliabilityBadge reliability={dict.reliability} />
@@ -97,14 +83,12 @@ function DictGroup({
         </div>
       </div>
 
-      {/* Entries */}
       <ul>
         {results.map((e) => (
           <ResultRow key={e.id} entry={e} dictSlug={dict.slug} backUrl={backUrl} />
         ))}
       </ul>
 
-      {/* Show all link */}
       {hasMore && (
         <div
           className="px-5 py-3"
@@ -117,7 +101,7 @@ function DictGroup({
             onMouseOver={(e) => ((e.target as HTMLElement).style.color = '#C9A84C')}
             onMouseOut={(e) => ((e.target as HTMLElement).style.color = '#7A6030')}
           >
-            Показать все {totalCount.toLocaleString('ru-RU')} результатов в «{displayName}» →
+            Показать все результаты в «{displayName}» →
           </a>
         </div>
       )}
@@ -142,19 +126,57 @@ function pluralDicts(n: number) {
   return 'словарях';
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────
+// ── Spinner ────────────────────────────────────────────────────────────────
 
-export default function SearchPage({ searchParams }: Props) {
-  const query = searchParams.q?.trim() ?? '';
-  const allDicts = isDatabaseAvailable() ? getDictionaries() : [];
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div
+        className="w-7 h-7 rounded-full border-2 border-gold/20 border-t-gold animate-spin"
+        style={{ borderTopColor: '#C9A84C' }}
+      />
+    </div>
+  );
+}
+
+// ── Main content ───────────────────────────────────────────────────────────
+
+function SearchContent() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get('q') ?? '';
+  const dictsParam = searchParams.get('dicts') ?? '';
+
+  const [groups, setGroups] = useState<GlobalSearchGroup[]>([]);
+  const [allDicts, setAllDicts] = useState<Dictionary[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!query) {
+      setGroups([]);
+      return;
+    }
+    setLoading(true);
+    const params = new URLSearchParams({ q: query });
+    if (dictsParam) params.set('dicts', dictsParam);
+    fetch(`/api/search?${params}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setGroups(data.groups ?? []);
+        if (data.dicts?.length) setAllDicts(data.dicts);
+        setLoading(false);
+      })
+      .catch(() => {
+        setGroups([]);
+        setLoading(false);
+      });
+  }, [query, dictsParam]);
+
   const allSlugs = allDicts.map((d) => d.slug);
-
-  // Resolve selected dicts from URL
-  const rawDicts = searchParams.dicts;
+  const rawDicts = dictsParam;
   let selectedDictSlugs: string[];
-  if (rawDicts === undefined) {
+  if (!rawDicts) {
     selectedDictSlugs = allSlugs;
-  } else if (!rawDicts || rawDicts === 'none') {
+  } else if (rawDicts === 'none') {
     selectedDictSlugs = [];
   } else {
     selectedDictSlugs = rawDicts.split(',').filter((s) => allSlugs.includes(s));
@@ -162,20 +184,13 @@ export default function SearchPage({ searchParams }: Props) {
 
   const allSelected = selectedDictSlugs.length === allSlugs.length;
 
-  // Build current page URL for "back" links in entry pages
   const backParams = new URLSearchParams({ q: query });
   if (!allSelected && selectedDictSlugs.length > 0) {
     backParams.set('dicts', selectedDictSlugs.join(','));
   }
   const backUrl = `/search?${backParams.toString()}`;
 
-  // Run search
-  const groups =
-    query && selectedDictSlugs.length > 0
-      ? globalSearch(query, allSelected ? undefined : selectedDictSlugs)
-      : [];
-
-  const totalResults = groups.reduce((sum, g) => sum + g.totalCount, 0);
+  const totalResults = groups.reduce((sum, g) => sum + g.results.length, 0);
 
   return (
     <div>
@@ -195,7 +210,6 @@ export default function SearchPage({ searchParams }: Props) {
 
       {query && (
         <div className="mt-6 flex gap-6">
-          {/* Filter sidebar */}
           {allDicts.length > 0 && (
             <div className="w-52 flex-shrink-0">
               <SearchFilters
@@ -206,9 +220,10 @@ export default function SearchPage({ searchParams }: Props) {
             </div>
           )}
 
-          {/* Results */}
           <div className="flex-1 min-w-0">
-            {selectedDictSlugs.length === 0 ? (
+            {loading ? (
+              <Spinner />
+            ) : selectedDictSlugs.length === 0 ? (
               <div
                 className="rounded-lg p-6"
                 style={{ border: '1px solid rgba(201,168,76,0.2)', background: 'rgba(201,168,76,0.04)' }}
@@ -251,5 +266,15 @@ export default function SearchPage({ searchParams }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchContent />
+    </Suspense>
   );
 }
