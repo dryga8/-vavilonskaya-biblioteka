@@ -18,17 +18,16 @@ from pathlib import Path
 # On Railway set DB_PATH=/app/data/dictionary.db
 DB_PATH = Path(os.environ.get('DB_PATH', str(Path(__file__).parent.parent / 'data' / 'dictionary.db')))
 
-# DSL_BASE: root folder that contains all DSL subdirectories.
-# Locally: C:\Users\PC\En-Ru   On Railway: /app/dsl
-_DSL_BASE_DEFAULT = str(Path(r'C:\Users\PC\En-Ru'))
+# DSL_BASE: folder containing all DSL files (flat, no subdirectories).
+# Locally: ./dsl/   On Railway: set DSL_PATH if files are elsewhere
+_DSL_BASE_DEFAULT = str(Path(__file__).parent.parent / 'dsl')
 DSL_BASE = Path(os.environ.get('DSL_PATH', _DSL_BASE_DEFAULT))
 
 # ── Dictionary list ────────────────────────────────────────────────────────
-# rel_path: path relative to DSL_BASE that contains the DSL file.
-# The script globs *.dsl inside it and picks the largest non-_abrv file.
+# filename: exact DSL filename inside DSL_BASE (flat folder, no subdirs).
 
 DICTIONARIES = [
-    # ── GENERAL / approved ───────────────────────────────────────────────────
+    # ── GENERAL ──────────────────────────────────────────────────────────────
     {
         "slug": "americana",
         "name": "Americana (En-Ru)",
@@ -37,7 +36,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "GENERAL",
-        "rel_path": r"En-Ru_Americana",
+        "filename": "AmericanaEnRu.dsl",
     },
     {
         "slug": "mueller",
@@ -45,9 +44,9 @@ DICTIONARIES = [
         "description": "",
         "color": "#8B3A2A",
         "language": "en",
-        "reliability": "approved",
+        "reliability": "caution",
         "field": "GENERAL",
-        "rel_path": r"2Boff\Muller 24",
+        "filename": "En-Ru_Mueller_24.dsl",
     },
     {
         "slug": "collins",
@@ -55,9 +54,9 @@ DICTIONARIES = [
         "description": "",
         "color": "#6C3483",
         "language": "en",
-        "reliability": "approved",
+        "reliability": "caution",
         "field": "GENERAL",
-        "rel_path": r"Universal\Collins",
+        "filename": "En-Ru_Collins.dsl",
     },
     {
         "slug": "oxford",
@@ -65,9 +64,9 @@ DICTIONARIES = [
         "description": "",
         "color": "#1A5276",
         "language": "en",
-        "reliability": "approved",
+        "reliability": "caution",
         "field": "GENERAL",
-        "rel_path": r"Universal\Oxford",
+        "filename": "En-Ru_Oxford.dsl",
     },
     {
         "slug": "courtney-phrasal",
@@ -75,11 +74,11 @@ DICTIONARIES = [
         "description": "",
         "color": "#2E4057",
         "language": "en",
-        "reliability": "approved",
+        "reliability": "caution",
         "field": "GENERAL",
-        "rel_path": r"Universal\Courtney - Phrasal Verbs",
+        "filename": "En-Ru_Phrasal_Verbs.dsl",
     },
-    # ── BIO / approved ────────────────────────────────────────────────────────
+    # ── BIO ───────────────────────────────────────────────────────────────────
     {
         "slug": "zoo-birds",
         "name": "5-язычный словарь. Птицы",
@@ -88,7 +87,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "rel_path": r"Special\ZOO\Birds",
+        "filename": "ENG-RUS_Birds5L_ncl.dsl",
     },
     {
         "slug": "zoo-fish",
@@ -98,7 +97,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "rel_path": r"Special\ZOO\Fish",
+        "filename": "ENG-RUS_Fishes5L_ncl.dsl",
     },
     {
         "slug": "zoo-insects",
@@ -108,7 +107,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "rel_path": r"Special\ZOO\Insects",
+        "filename": "ENG-RUS_Insects5L_ncl.dsl",
     },
     {
         "slug": "zoo-mammals",
@@ -118,7 +117,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "rel_path": r"Special\ZOO\Mammals",
+        "filename": "ENG-RUS_Mammals5L_ncl.dsl",
     },
     {
         "slug": "zoo-reptiles",
@@ -128,7 +127,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "BIO",
-        "rel_path": r"Special\ZOO\Reptiles",
+        "filename": "ENG-RUS_Reptiles5L_ncl.dsl",
     },
     {
         "slug": "bio-general",
@@ -136,9 +135,9 @@ DICTIONARIES = [
         "description": "",
         "color": "#2d5a27",
         "language": "en",
-        "reliability": "approved",
+        "reliability": "caution",
         "field": "BIO",
-        "rel_path": r"Special\BIO\Biology",
+        "filename": "BiologyEnRu.dsl",
     },
     {
         "slug": "biotech",
@@ -146,9 +145,19 @@ DICTIONARIES = [
         "description": "",
         "color": "#1a5c3a",
         "language": "en",
-        "reliability": "approved",
+        "reliability": "caution",
         "field": "BIO",
-        "rel_path": r"Special\BIO\Biotech",
+        "filename": "Biotech_Eng-Rus_di_1_1.dsl",
+    },
+    {
+        "slug": "biotech2",
+        "name": "Биотехнологии 2",
+        "description": "",
+        "color": "#2a5c3a",
+        "language": "en",
+        "reliability": "caution",
+        "field": "BIO",
+        "filename": "eng-rus_Biotechnology_v1.0.dsl",
     },
     {
         "slug": "plant-tissue",
@@ -156,11 +165,11 @@ DICTIONARIES = [
         "description": "",
         "color": "#3a5c1a",
         "language": "en",
-        "reliability": "approved",
+        "reliability": "caution",
         "field": "BIO",
-        "rel_path": r"Special\BIO\Plant tissue culture",
+        "filename": "En-Ru Plant tissue culture 1986 Erlykina.dsl",
     },
-    # ── MED / approved ────────────────────────────────────────────────────────
+    # ── MED ───────────────────────────────────────────────────────────────────
     {
         "slug": "who-vaccinology",
         "name": "Вакцинология ВОЗ",
@@ -169,9 +178,8 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "approved",
         "field": "MED",
-        "rel_path": r"Special\MED\WHO Vaccinology",
+        "filename": "eng-rus_WHO_Vaccinology_1_0.dsl",
     },
-    # ── MED / caution ─────────────────────────────────────────────────────────
     {
         "slug": "med-rivkin",
         "name": "Медицинский словарь. Ривкин",
@@ -180,17 +188,17 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "rel_path": r"Special\MED\Medical - Ривкин",
+        "filename": "ENG-RUS_Medical-big.dsl",
     },
     {
-        "slug": "med-drozdov",
-        "name": "Медицина. Дроздов",
+        "slug": "med-general",
+        "name": "Медицина. Общий",
         "description": "",
         "color": "#6b1a2d",
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "rel_path": r"Special\MED\Medicine General",
+        "filename": "En-Ru_Medicine_General.dsl",
     },
     {
         "slug": "pharmacopeia",
@@ -200,7 +208,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "rel_path": r"Special\MED\Pharmacopeia",
+        "filename": "Pharmacopeia.dsl",
     },
     {
         "slug": "psychology",
@@ -210,7 +218,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "rel_path": r"Special\MED\Psychology",
+        "filename": "PsychologyEnRu.dsl",
     },
     {
         "slug": "med-akzhigitov",
@@ -220,7 +228,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "rel_path": r"Special\MED\Медицина. Большой - Акжигитов",
+        "filename": "MedicalEnRu.dsl",
     },
     {
         "slug": "genetics",
@@ -230,7 +238,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "rel_path": r"Special\MED\Генетика - Картель",
+        "filename": "en-ru_kartel.dsl",
     },
     {
         "slug": "gcp",
@@ -240,9 +248,19 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "MED",
-        "rel_path": r"Special\MED\Надлежащая клиническая практика",
+        "filename": "en-ru_GCP_rustproof_1_0.dsl",
     },
-    # ── GEO / caution ─────────────────────────────────────────────────────────
+    {
+        "slug": "med-olek",
+        "name": "Медицинский словарь. Олек",
+        "description": "",
+        "color": "#4a2d5c",
+        "language": "en",
+        "reliability": "caution",
+        "field": "MED",
+        "filename": "En-Ru_Medical_Olek.dsl",
+    },
+    # ── GEO ───────────────────────────────────────────────────────────────────
     {
         "slug": "wild-west",
         "name": "Энциклопедия Дикого Запада",
@@ -251,7 +269,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "rel_path": r"Special\GEO\Энциклопедия Дикого Запада",
+        "filename": "Wild_West.dsl",
     },
     {
         "slug": "usa-toponyms",
@@ -261,7 +279,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "rel_path": r"Special\GEO\USA toponyms",
+        "filename": "USA toponyms.dsl",
     },
     {
         "slug": "aus-nz",
@@ -271,7 +289,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "rel_path": r"Special\GEO\Australia - New Zealand",
+        "filename": "En-Ru_Australia_New_Zealand.dsl",
     },
     {
         "slug": "great-britain",
@@ -281,7 +299,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "rel_path": r"Special\GEO\Great Britain",
+        "filename": "GreatBritainEnRu.dsl",
     },
     {
         "slug": "geonames",
@@ -291,9 +309,9 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "GEO",
-        "rel_path": r"Special\GEO\GeoNames",
+        "filename": "GeoNames (En-Ru).dsl",
     },
-    # ── AVIA / caution ────────────────────────────────────────────────────────
+    # ── AVIA ──────────────────────────────────────────────────────────────────
     {
         "slug": "civil-aviation",
         "name": "Гражданская авиация. Марасанов",
@@ -302,7 +320,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "AVIA",
-        "rel_path": r"Special\AVIA\Марасанов - Civil Aviation",
+        "filename": "Марасанов - Civil Aviation.dsl",
     },
     {
         "slug": "avia-space",
@@ -312,9 +330,9 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "AVIA",
-        "rel_path": r"Special\AVIA\Мурашкевич - Avia & Space",
+        "filename": "Мурашкевич - Avia & Space.dsl",
     },
-    # ── TECH / caution ────────────────────────────────────────────────────────
+    # ── TECH ──────────────────────────────────────────────────────────────────
     {
         "slug": "transport",
         "name": "Машиностроение. Косов",
@@ -323,7 +341,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "TECH",
-        "rel_path": r"Special\AUTO\Transport",
+        "filename": "TransportEnRu.dsl",
     },
     {
         "slug": "auto-terms",
@@ -333,19 +351,9 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "TECH",
-        "rel_path": r"Special\AUTO\Auto (Тверитнев)",
+        "filename": "AutoEnRu.dsl",
     },
-    {
-        "slug": "antennas",
-        "name": "Антенны. Резников",
-        "description": "",
-        "color": "#3a1a3a",
-        "language": "en",
-        "reliability": "caution",
-        "field": "TECH",
-        "rel_path": r"Special\BIO\Biotechnology",
-    },
-    # ── CHEM / caution ────────────────────────────────────────────────────────
+    # ── CHEM ──────────────────────────────────────────────────────────────────
     {
         "slug": "chem-terms",
         "name": "Химические термины",
@@ -354,9 +362,9 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "CHEM",
-        "rel_path": r"Special\CHEM\ChemTerms",
+        "filename": "eng_rus_chemistry_tm_v01.dsl",
     },
-    # ── ARTS / caution ────────────────────────────────────────────────────────
+    # ── ARTS ──────────────────────────────────────────────────────────────────
     {
         "slug": "theatre",
         "name": "Театральный словарь. Перель",
@@ -365,9 +373,9 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "ARTS",
-        "rel_path": r"Special\ARTS\Театр. Перель",
+        "filename": "Театр. Перель (En-Ru).dsl",
     },
-    # ── AGRO / caution ────────────────────────────────────────────────────────
+    # ── AGRO ──────────────────────────────────────────────────────────────────
     {
         "slug": "agro",
         "name": "Агротехнологии. Адаменко",
@@ -376,9 +384,9 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "AGRO",
-        "rel_path": r"Special\AGRO\Агротехнологии - Адаменко",
+        "filename": "Агротехнологии - Адаменко.dsl",
     },
-    # ── OTHER / caution ───────────────────────────────────────────────────────
+    # ── OTHER ─────────────────────────────────────────────────────────────────
     {
         "slug": "homophones",
         "name": "Омофоны. Мостицкий",
@@ -387,7 +395,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "OTHER",
-        "rel_path": r"Mostitsky\Homophones",
+        "filename": "En-Ru_Mostitsky_Homophones.dsl",
     },
     {
         "slug": "bank-cards",
@@ -397,7 +405,7 @@ DICTIONARIES = [
         "language": "en",
         "reliability": "caution",
         "field": "OTHER",
-        "rel_path": r"Special\COMP\Bank Cards",
+        "filename": "px_bank_cards.dsl",
     },
 ]
 
@@ -466,17 +474,6 @@ def first_letter(title: str) -> str:
 
 
 # ── File helpers ───────────────────────────────────────────────────────────
-
-def find_dsl_file(directory: Path) -> Path | None:
-    """Return the largest non-abrv DSL file in *directory* (non-recursive)."""
-    candidates = [
-        f for f in directory.glob('*.dsl')
-        if not f.stem.lower().endswith('_abrv')
-    ]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda f: f.stat().st_size)
-
 
 def read_dsl_lines(path: Path) -> list[str]:
     """Read DSL file, trying several encodings in order."""
@@ -586,14 +583,9 @@ def load_dictionary(con: sqlite3.Connection, cfg: dict) -> int:
         return 0
 
     # Find DSL file
-    directory = DSL_BASE / cfg['rel_path']
-    if not directory.is_dir():
-        print(f"  [ERROR] {cfg['name']}: directory not found: {directory}")
-        return 0
-
-    dsl_file = find_dsl_file(directory)
-    if dsl_file is None:
-        print(f"  [ERROR] {cfg['name']}: no DSL file in {directory}")
+    dsl_file = DSL_BASE / cfg['filename']
+    if not dsl_file.is_file():
+        print(f"  [ERROR] {cfg['name']}: file not found: {dsl_file}")
         return 0
 
     print(f"  Файл: {dsl_file.name} ({dsl_file.stat().st_size // 1024:,} KB)", flush=True)
