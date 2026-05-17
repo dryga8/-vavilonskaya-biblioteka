@@ -22,7 +22,7 @@ export function ReliabilityBadge({
           whiteSpace: 'nowrap',
         }}
       >
-        ✓ Одобрено редакцией
+        ✓ Верим
       </span>
     );
   }

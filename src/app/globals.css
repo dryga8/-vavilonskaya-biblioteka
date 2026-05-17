@@ -87,6 +87,127 @@
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0%, transparent 100%);
 }
 
+/* ── Dictionary card grid ─────────────────────────────────────────────────── */
+
+.dict-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.dict-pill {
+  padding: 5px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid #C9A84C;
+  background: transparent;
+  color: #C9A84C;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dict-pill:hover {
+  background: rgba(201, 168, 76, 0.12);
+}
+
+.dict-pill-active {
+  background: #C9A84C;
+  color: #0F0F1A;
+}
+
+.dict-pill-active:hover {
+  background: #d4b05a;
+}
+
+.dict-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .dict-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .dict-grid { grid-template-columns: 1fr; }
+}
+
+.dict-card {
+  display: flex;
+  background: #FAF8F2;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: 1px solid rgba(201, 168, 76, 0.15);
+}
+
+.dict-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.dict-card-strip {
+  width: 4px;
+  flex-shrink: 0;
+  transition: filter 0.15s ease;
+}
+
+.dict-card:hover .dict-card-strip {
+  filter: brightness(0.7);
+}
+
+.dict-card-body {
+  flex: 1;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.dict-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.dict-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1A1A2E;
+  line-height: 1.3;
+}
+
+.dict-card-field {
+  font-size: 10px;
+  color: #9090A0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-top: 2px;
+}
+
+.dict-card-desc {
+  font-size: 12px;
+  color: #4A4A6A;
+  margin-top: 8px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dict-card-count {
+  font-size: 10px;
+  color: #9090A0;
+  margin-top: 8px;
+  font-family: monospace;
+}
+
 @layer utilities {
   .card-parchment {
     background-color: #FAF8F2;
