@@ -145,6 +145,7 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') ?? '';
   const dictsParam = searchParams.get('dicts') ?? '';
+  const reliable = searchParams.get('reliable') === '1';
 
   const [groups, setGroups] = useState<GlobalSearchGroup[]>([]);
   const [allDicts, setAllDicts] = useState<Dictionary[]>([]);
@@ -158,6 +159,7 @@ function SearchContent() {
     setLoading(true);
     const params = new URLSearchParams({ q: query });
     if (dictsParam) params.set('dicts', dictsParam);
+    if (reliable) params.set('reliable', '1');
     fetch(`/api/search?${params}`)
       .then((r) => r.json())
       .then((data) => {
@@ -169,7 +171,7 @@ function SearchContent() {
         setGroups([]);
         setLoading(false);
       });
-  }, [query, dictsParam]);
+  }, [query, dictsParam, reliable]);
 
   const allSlugs = allDicts.map((d) => d.slug);
   const rawDicts = dictsParam;
@@ -216,6 +218,7 @@ function SearchContent() {
                 dicts={allDicts}
                 selectedDictSlugs={selectedDictSlugs}
                 query={query}
+                reliable={reliable}
               />
             </div>
           )}
