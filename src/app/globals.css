@@ -153,7 +153,7 @@
 }
 
 .dict-card-strip {
-  width: 4px;
+  width: 12px;
   flex-shrink: 0;
   transition: filter 0.15s ease;
 }

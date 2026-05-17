@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { type Dictionary } from '@/lib/db';
 import { ReliabilityBadge } from '@/components/ReliabilityBadge';
+import { FIELD_COLORS } from '@/lib/fieldColors';
 
 const CATEGORIES = [
   { key: 'ALL',     label: 'Все' },
@@ -27,9 +28,10 @@ function effectiveField(dict: Dictionary): string {
 }
 
 function DictCard({ dict }: { dict: Dictionary }) {
+  const stripColor = FIELD_COLORS[effectiveField(dict)] ?? '#4a4a6a';
   return (
     <a href={`/${dict.slug}`} className="dict-card" title={dict.name}>
-      <div className="dict-card-strip" style={{ background: dict.color }} />
+      <div className="dict-card-strip" style={{ background: stripColor }} />
       <div className="dict-card-body">
         <div className="dict-card-top">
           <div style={{ minWidth: 0 }}>
